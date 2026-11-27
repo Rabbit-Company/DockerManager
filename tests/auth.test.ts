@@ -31,7 +31,9 @@ describe("first run setup", () => {
 		expect(ok.headers.get("Location")).toBe("/");
 		const overview = await get(app, "/", cookieFrom(ok));
 		expect(overview.status).toBe(200);
-		expect(await overview.text()).toContain("No hosts yet");
+		const html = await overview.text();
+		expect(html).toContain("<h1>Datacenter</h1>");
+		expect(html).toContain('<span class="user-name">admin</span>');
 
 		const again = await get(app, "/setup");
 		expect(again.headers.get("Location")).toBe("/login");

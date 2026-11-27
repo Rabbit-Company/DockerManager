@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
 import { channelValues, deliver, parseChannel, type Notice } from "../src/controller/alerts/channels.ts";
 import { Alerting, conditions } from "../src/controller/alerts/engine.ts";
@@ -283,6 +283,10 @@ describe("the engine", () => {
 	const published: string[] = [];
 	const hub = new Hub({ publish: (t) => published.push(t), saveFacts: async () => {}, touch: async () => {}, metrics: () => {}, warn: () => {} });
 	const alerting = new Alerting(hub, "https://ctl", Date.now() - 3_600_000);
+	// Other test files share the database and may have changed rule settings through the form.
+	beforeAll(async () => {
+		for (const rule of RULES) await saveRuleSetting(rule.id, defaultSetting(rule.id));
+	});
 
 	test("conditions fire after their minutes, notify, and resolve", async () => {
 		await sql`DELETE FROM alerts`;
