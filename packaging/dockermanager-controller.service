@@ -1,0 +1,22 @@
+[Unit]
+Description=DockerManager controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=dockermanager
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/dockermanager
+Environment=DATABASE_URL=sqlite:///var/lib/dockermanager/controller.sqlite
+Environment=SECRETS_KEY_FILE=/var/lib/dockermanager/secret.key
+Environment=AGENT_DOWNLOADS=/opt/dockermanager
+Environment=BIND_ADDRESS=127.0.0.1
+EnvironmentFile=/etc/dockermanager/controller.env
+ExecStart=/usr/local/bin/dockermanager-controller
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

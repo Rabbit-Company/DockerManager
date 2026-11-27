@@ -1,0 +1,65 @@
+name: Release binaries
+
+on:
+  push:
+    tags:
+      - "v[0-9]*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - run: bun ci
+      - run: bun run typecheck
+      - run: bun test
+      - run: bun run scripts/check-release.ts
+        if: github.ref_type == 'tag'
+      - run: bun run build
+      - name: Package binaries
+        run: |
+          mkdir -p release
+          install -m 755 dist/controller-linux-x64 release/dockermanager-controller-linux-x64
+          install -m 755 dist/controller-linux-arm64 release/dockermanager-controller-linux-arm64
+          install -m 755 dist/agent-linux-x64 release/dockermanager-agent-linux-x64
+          install -m 755 dist/agent-linux-arm64 release/dockermanager-agent-linux-arm64
+          for arch in x64 arm64; do
+            stage="/tmp/dockermanager-package-$arch"
+            mkdir -p "$stage"
+            install -m 755 "dist/controller-linux-$arch" "$stage/dockermanager-controller"
+            install -m 755 dist/agent-linux-x64 "$stage/agent-linux-x64"
+            install -m 755 dist/agent-linux-arm64 "$stage/agent-linux-arm64"
+            install -m 644 packaging/dockermanager-controller.service "$stage/dockermanager-controller.service"
+            tar -C "$stage" -czf "release/dockermanager-linux-$arch.tar.gz" .
+          done
+          cd release
+          sha256sum dockermanager-* > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dockermanager-binaries
+          path: release/
+          if-no-files-found: error
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dockermanager-binaries
+          path: release
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release create "$GITHUB_REF_NAME" release/* --verify-tag --generate-notes
