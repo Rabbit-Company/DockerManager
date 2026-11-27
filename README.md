@@ -26,7 +26,7 @@ DockerManager is young. Try it on hosts you can afford to break before you trust
 **Monitoring**
 
 - CPU, memory, load, network, disk I/O and filesystems for every host and container, sampled every 10 seconds
-- History charts from 1 hour to 1 year, with a crosshair readout and a table view
+- History charts from 1 hour to 1 year: drag to zoom in, pan, open any chart full screen, and a zoomed window loads at the finest detail still stored
 - Image, container, volume and build cache sizes
 - NVMe SMART health and wear, and Linux software RAID state
 

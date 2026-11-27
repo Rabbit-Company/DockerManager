@@ -4,7 +4,7 @@ import { checkHostName, isContainerRef } from "../../../shared/validate.ts";
 import { checkCsrf, clientIp, field, formData, NO_STORE, page, redirect, safeNext, type Auth } from "../../auth.ts";
 import { config } from "../../config.ts";
 import { audit, listAudit } from "../../db/audit.ts";
-import { HOST_TARGET, isRange, readSeries } from "../../db/metrics.ts";
+import { HOST_TARGET, isRange, MIN_WINDOW, readSeries, readWindow } from "../../db/metrics.ts";
 import { listAllStacks, listStacks, type Stack } from "../../db/stacks.ts";
 import { countUpdates } from "../../ssr/pages/updates.ts";
 import type { Updates } from "../../updates.ts";
@@ -376,8 +376,19 @@ export function hostRoutes(app: Web<AppState>, hub: Hub, updates: Updates, firew
 		const range = params.get("range");
 		const stacks = await listStacks(host.id);
 		const target = params.get("target") ?? HOST_TARGET;
-		if (!isRange(range) || target.length > 255) throw badRequest("Unknown range.");
-		const series = await readSeries(host.id, target, range);
+		if (target.length > 255) throw badRequest("Unknown target.");
+		let series;
+		if (params.has("from") || params.has("to")) {
+			const from = Number(params.get("from"));
+			const to = Number(params.get("to"));
+			const now = Math.floor(Date.now() / 1000);
+			if (!Number.isInteger(from) || !Number.isInteger(to) || to - from < MIN_WINDOW || from < now - 400 * 86_400 || to > now + 3600)
+				throw badRequest("The time window is not valid.");
+			series = await readWindow(host.id, target, from, to, config.metrics, now);
+		} else {
+			if (!isRange(range)) throw badRequest("Unknown range.");
+			series = await readSeries(host.id, target, range);
+		}
 		const cpus = (hub.facts(host.id) ?? host.facts)?.cpus ?? null;
 		return Response.json({ ...series, cpus }, { headers: { "Cache-Control": NO_STORE } });
 	});

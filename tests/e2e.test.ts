@@ -185,6 +185,12 @@ describe("agent and controller over a real socket", () => {
 		expect(series.cpus).toBe(8);
 		expect(series.cpu.filter((v) => v !== null)).toEqual([0.5, 1]);
 		expect((await fetch(`${base}/hosts/${hostId}/metrics.json?range=2h`, { headers: { Cookie: user.cookie } })).status).toBe(400);
+		const zoomed = await fetch(`${base}/hosts/${hostId}/metrics.json?from=${now - 120}&to=${now + 10}&target=shop-web-1`, { headers: { Cookie: user.cookie } });
+		const window = (await zoomed.json()) as { step: number; range: string | null; cpu: (number | null)[] };
+		expect([window.step, window.range]).toEqual([10, null]);
+		expect(window.cpu.filter((v) => v !== null)).toEqual([0.5, 1]);
+		for (const bad of [`from=${now}&to=${now + 30}`, `from=${now - 500 * 86_400}&to=${now}`, `from=abc&to=${now}`, `from=${now - 60}`])
+			expect((await fetch(`${base}/hosts/${hostId}/metrics.json?${bad}`, { headers: { Cookie: user.cookie } })).status).toBe(400);
 		expect((await fetch(`${base}/hosts/${hostId}/metrics.json?range=1h`)).status).toBe(401);
 	});
 

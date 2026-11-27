@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { MetricsSample } from "../src/shared/protocol.ts";
 import { sql } from "../src/controller/db/index.ts";
 import { createHost } from "../src/controller/db/hosts.ts";
-import { HOST_TARGET, MetricsStore, readSeries, rowsFromSample } from "../src/controller/db/metrics.ts";
+import { HOST_TARGET, MetricsStore, readSeries, readWindow, rowsFromSample, WINDOW_POINTS } from "../src/controller/db/metrics.ts";
 
 function sample(t: number, cpu: number, mem = 100): MetricsSample {
 	return {
@@ -52,6 +52,33 @@ describe("metrics store", () => {
 		const hostSeries = await readSeries(host.id, HOST_TARGET, "6h", BASE + 120);
 		expect(hostSeries.step).toBe(60);
 		expect(hostSeries.cpu[hostSeries.t.indexOf(BASE)]).toBe(2);
+	});
+
+	test("a zoomed window reads the finest table that still holds its start", async () => {
+		const { host } = await createHost("metrics-window");
+		const retention = { rawHours: 24, minuteDays: 14, hourDays: 365 };
+		const store = new MetricsStore(retention);
+		for (let i = 0; i < 12; i++) store.add(host.id, [sample(BASE + i * 10, i < 6 ? 1 : 3)]);
+		await store.flush();
+		await store.rollup(BASE + 7200);
+
+		const fine = await readWindow(host.id, "web", BASE - 30, BASE + 150, retention, BASE + 300);
+		expect(fine.range).toBeNull();
+		expect(fine.step).toBe(10);
+		expect(fine.from).toBe(BASE - 30);
+		expect(fine.cpu[fine.t.indexOf(BASE + 50)]).toBe(1);
+		expect(fine.cpu[fine.t.indexOf(BASE + 60)]).toBe(3);
+
+		const wide = await readWindow(host.id, "web", BASE - 86_400, BASE + 3600, retention, BASE + 7200);
+		expect(wide.t.length).toBeLessThanOrEqual(WINDOW_POINTS);
+		expect(wide.step % 10).toBe(0);
+
+		const old = await readWindow(host.id, "web", BASE, BASE + 600, retention, BASE + 2 * 86_400);
+		expect(old.step).toBe(60);
+		expect(old.cpu.slice(0, 2)).toEqual([1, 3]);
+
+		const ancient = await readWindow(host.id, "web", BASE, BASE + 600, retention, BASE + 30 * 86_400);
+		expect(ancient.step).toBe(3600);
 	});
 
 	test("late samples are rolled up again", async () => {

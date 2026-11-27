@@ -1345,6 +1345,149 @@ details summary h2 {
 	line-height: 1.5;
 }
 
+/* Terminal colors in log output. The log panel is dark in both themes, so one palette serves both. */
+.log-output {
+	--ansi-0: #4a5260;
+	--ansi-1: #f0716b;
+	--ansi-2: #8fd16a;
+	--ansi-3: #e6c45c;
+	--ansi-4: #5fa8ff;
+	--ansi-5: #d38cf0;
+	--ansi-6: #4fd1d9;
+	--ansi-7: #c7ced8;
+	--ansi-8: #7d8794;
+	--ansi-9: #ff8f88;
+	--ansi-10: #b0ec8a;
+	--ansi-11: #ffe07a;
+	--ansi-12: #8cc4ff;
+	--ansi-13: #ebaeff;
+	--ansi-14: #84ecf2;
+	--ansi-15: #ffffff;
+}
+
+.ansi-fg-0 {
+	color: var(--ansi-0);
+}
+.ansi-fg-1 {
+	color: var(--ansi-1);
+}
+.ansi-fg-2 {
+	color: var(--ansi-2);
+}
+.ansi-fg-3 {
+	color: var(--ansi-3);
+}
+.ansi-fg-4 {
+	color: var(--ansi-4);
+}
+.ansi-fg-5 {
+	color: var(--ansi-5);
+}
+.ansi-fg-6 {
+	color: var(--ansi-6);
+}
+.ansi-fg-7 {
+	color: var(--ansi-7);
+}
+.ansi-fg-8 {
+	color: var(--ansi-8);
+}
+.ansi-fg-9 {
+	color: var(--ansi-9);
+}
+.ansi-fg-10 {
+	color: var(--ansi-10);
+}
+.ansi-fg-11 {
+	color: var(--ansi-11);
+}
+.ansi-fg-12 {
+	color: var(--ansi-12);
+}
+.ansi-fg-13 {
+	color: var(--ansi-13);
+}
+.ansi-fg-14 {
+	color: var(--ansi-14);
+}
+.ansi-fg-15 {
+	color: var(--ansi-15);
+}
+.ansi-fg-inverse {
+	color: #0a0e14;
+}
+
+.ansi-bg-0 {
+	background: var(--ansi-0);
+}
+.ansi-bg-1 {
+	background: var(--ansi-1);
+}
+.ansi-bg-2 {
+	background: var(--ansi-2);
+}
+.ansi-bg-3 {
+	background: var(--ansi-3);
+}
+.ansi-bg-4 {
+	background: var(--ansi-4);
+}
+.ansi-bg-5 {
+	background: var(--ansi-5);
+}
+.ansi-bg-6 {
+	background: var(--ansi-6);
+}
+.ansi-bg-7 {
+	background: var(--ansi-7);
+}
+.ansi-bg-8 {
+	background: var(--ansi-8);
+}
+.ansi-bg-9 {
+	background: var(--ansi-9);
+}
+.ansi-bg-10 {
+	background: var(--ansi-10);
+}
+.ansi-bg-11 {
+	background: var(--ansi-11);
+}
+.ansi-bg-12 {
+	background: var(--ansi-12);
+}
+.ansi-bg-13 {
+	background: var(--ansi-13);
+}
+.ansi-bg-14 {
+	background: var(--ansi-14);
+}
+.ansi-bg-15 {
+	background: var(--ansi-15);
+}
+.ansi-bg-inverse {
+	background: #d3dae3;
+}
+
+.ansi-bold {
+	font-weight: 700;
+}
+.ansi-dim {
+	opacity: 0.65;
+}
+.ansi-italic {
+	font-style: italic;
+}
+.ansi-underline {
+	text-decoration: underline;
+}
+.ansi-strike {
+	text-decoration: line-through;
+}
+.ansi-underline-strike {
+	text-decoration: underline line-through;
+}
+
 /* Bare pages */
 
 body.bare {
@@ -1684,6 +1827,63 @@ td .metric {
 	min-width: 0;
 }
 
+.charts-tools {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.charts-tools [hidden] {
+	display: none;
+}
+
+.charts-hint {
+	margin: -8px 0 0;
+}
+
+.chart-caption-end {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 10px;
+}
+
+.chart-full {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--muted);
+	font: inherit;
+	font-size: 0.78rem;
+	cursor: pointer;
+}
+
+.chart-full:hover,
+.chart-full:focus-visible {
+	color: var(--text);
+	text-decoration: underline;
+}
+
+.chart-plot canvas {
+	cursor: crosshair;
+}
+
+.chart:fullscreen {
+	padding: 24px 28px;
+	background: var(--surface);
+	color: var(--text);
+}
+
+.chart:fullscreen .chart-plot {
+	flex: 1;
+	height: auto;
+	min-height: 0;
+}
+
+.chart:fullscreen .chart-title {
+	font-size: 1.1rem;
+}
+
 .chart figcaption {
 	display: flex;
 	justify-content: space-between;
@@ -1737,65 +1937,6 @@ td .metric {
 	border-radius: 6px;
 }
 
-.chart-svg {
-	display: block;
-	overflow: visible;
-}
-
-.chart-rule {
-	stroke: var(--grid);
-	stroke-width: 1;
-}
-
-.chart-base {
-	stroke: var(--axis);
-	stroke-width: 1;
-}
-
-.chart-tick {
-	fill: var(--muted);
-	font-size: 11px;
-	font-variant-numeric: tabular-nums;
-}
-
-.chart-line {
-	fill: none;
-	stroke-width: 2;
-	stroke-linejoin: round;
-	stroke-linecap: round;
-}
-
-.chart-line.s1 {
-	stroke: var(--series-1);
-}
-
-.chart-line.s2 {
-	stroke: var(--series-2);
-}
-
-.chart-area.s1 {
-	fill: var(--series-1);
-	fill-opacity: 0.1;
-}
-
-.chart-cross {
-	stroke: var(--muted);
-	stroke-width: 1;
-}
-
-.chart-dot {
-	stroke: var(--surface);
-	stroke-width: 2;
-}
-
-.chart-dot.s1 {
-	fill: var(--series-1);
-}
-
-.chart-dot.s2 {
-	fill: var(--series-2);
-}
-
 .chart-key {
 	display: inline-block;
 	flex: none;
@@ -1807,32 +1948,6 @@ td .metric {
 
 .chart-key.s2 {
 	background: var(--series-2);
-}
-
-.chart-tip {
-	position: absolute;
-	z-index: 5;
-	min-width: 150px;
-	padding: 8px 10px;
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	background: var(--surface);
-	box-shadow: 0 4px 16px rgb(0 0 0 / 14%);
-	font-size: 0.8rem;
-	pointer-events: none;
-	font-variant-numeric: tabular-nums;
-}
-
-.chart-tip-time {
-	color: var(--muted);
-	margin-bottom: 4px;
-}
-
-.chart-tip-row {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	white-space: nowrap;
 }
 
 .chart-table summary {

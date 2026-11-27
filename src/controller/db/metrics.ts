@@ -205,7 +205,8 @@ export function isRange(value: string | null | undefined): value is Range {
 }
 
 export interface Series {
-	range: Range;
+	/** The named range, or null for a window picked by zooming. */
+	range: Range | null;
 	step: number;
 	from: number;
 	to: number;
@@ -224,11 +225,45 @@ export interface Series {
 
 const num = (value: unknown): number | null => (value === null || value === undefined ? null : Number(value));
 
+type Table = "raw" | Level;
+
 /** One point per step across the whole range, with null where nothing was recorded, so gaps show as gaps. */
 export async function readSeries(hostId: number, target: string, range: Range, now = Math.floor(Date.now() / 1000)): Promise<Series> {
 	const { seconds, level, step } = RANGES[range];
 	const to = Math.floor(now / step) * step + step;
 	const from = to - Math.ceil(seconds / step) * step;
+	return query(hostId, target, range, level, step, from, to);
+}
+
+/** Steps a zoomed window may use. Each is a whole multiple of the table it reads, so buckets line up with stored rows. */
+const WINDOW_STEPS = [10, 20, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 10_800, 21_600, 43_200, 86_400];
+/** Enough points to fill a full screen chart without drawing more than a pixel can show. */
+export const WINDOW_POINTS = 720;
+/** The narrowest window, a few raw samples. */
+export const MIN_WINDOW = 60;
+
+/**
+ * A window chosen by zooming, read from the finest table that still holds its start,
+ * with the smallest step that keeps it within WINDOW_POINTS points.
+ */
+export async function readWindow(
+	hostId: number,
+	target: string,
+	fromTime: number,
+	toTime: number,
+	retention: Retention = DEFAULT_RETENTION,
+	now = Math.floor(Date.now() / 1000),
+): Promise<Series> {
+	const level: Table = fromTime >= now - retention.rawHours * 3600 ? "raw" : fromTime >= now - retention.minuteDays * 86_400 ? "1m" : "1h";
+	const least = level === "raw" ? 10 : level === "1m" ? 60 : 3600;
+	const span = Math.max(MIN_WINDOW, toTime - fromTime);
+	const step = WINDOW_STEPS.find((s) => s >= least && s % least === 0 && span / s <= WINDOW_POINTS) ?? WINDOW_STEPS[WINDOW_STEPS.length - 1]!;
+	const from = Math.floor(fromTime / step) * step;
+	const to = Math.ceil(toTime / step) * step;
+	return query(hostId, target, null, level, step, from, Math.max(to, from + step));
+}
+
+async function query(hostId: number, target: string, range: Range | null, level: Table, step: number, from: number, to: number): Promise<Series> {
 	const table = level === "raw" ? sql`metrics_raw` : level === "1m" ? sql`metrics_1m` : sql`metrics_1h`;
 	const rows: Record<string, unknown>[] = await sql`
 		SELECT ts - (ts % ${step}) AS b, AVG(cpu) AS cpu, MAX(cpu_max) AS cpu_max, AVG(mem) AS mem, MAX(mem_max) AS mem_max, MAX(mem_limit) AS mem_limit,

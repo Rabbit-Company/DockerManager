@@ -1,4 +1,5 @@
 import { outputTime } from "../shared/output-time.ts";
+import { AnsiParser, renderSegments } from "./ansi.ts";
 import { startCharts, type LiveSample } from "./charts.ts";
 import { jobOutput, type JobMessage } from "./job.ts";
 import { updateLiveValues } from "./live-metrics.ts";
@@ -119,15 +120,42 @@ function logs(live: Live): void {
 	let started = false;
 	const timeZone = document.querySelector<HTMLMetaElement>('meta[name="time-zone"]')?.content || undefined;
 	let times = new LogTimeFormatter(timeZone);
+	const colors = new AnsiParser(true);
+	let shown = 0;
 
-	const append = (text: string) => {
+	const clear = (text = "") => {
+		output.textContent = text;
+		shown = text.length;
+		colors.reset();
+	};
+
+	/** Adds log text with its terminal colors. Past the limit, whole nodes leave from the top so the colors stay intact. */
+	const append = (text: string, plain = false) => {
 		const atBottom = output.scrollHeight - output.scrollTop - output.clientHeight < 40;
 		if (!started) {
-			output.textContent = "";
+			clear();
 			started = true;
 		}
-		output.append(text);
-		if ((output.textContent?.length ?? 0) > MAX_LOG_CHARS) output.textContent = output.textContent!.slice(-MAX_LOG_CHARS / 2);
+		if (plain) output.append(text);
+		else output.append(renderSegments(document, colors.push(text)));
+		shown += text.length;
+		if (shown > MAX_LOG_CHARS) {
+			while (output.firstChild && shown > MAX_LOG_CHARS / 2) {
+				const first = output.firstChild;
+				const length = first.textContent?.length ?? 0;
+				const excess = shown - MAX_LOG_CHARS / 2;
+				if (first instanceof Text && length > excess) {
+					const end = first.data.indexOf("\n", excess);
+					const cut = end === -1 ? length : end + 1;
+					first.data = first.data.slice(cut);
+					shown -= cut;
+					if (cut === length) first.remove();
+					break;
+				}
+				shown -= length;
+				first.remove();
+			}
+		}
 		if (follow && atBottom) output.scrollTop = output.scrollHeight;
 	};
 
@@ -136,14 +164,14 @@ function logs(live: Live): void {
 		stream = null;
 		started = false;
 		times = new LogTimeFormatter(timeZone);
-		output.textContent = "Connecting...";
+		clear("Connecting...");
 		live.send({ type: "logs.open", host, container, tail: Number(tailSelect.value) });
 	};
 
 	live.handlers.push((message) => {
 		if (message.type === "logs.opened") {
 			stream = message.stream;
-			if (!started) output.textContent = "";
+			if (!started) clear();
 			started = true;
 		} else if (message.type === "logs" && message.stream === stream) {
 			const text = times.push(message.data);
@@ -151,7 +179,8 @@ function logs(live: Live): void {
 		} else if (message.type === "logs.end" && (message.stream === stream || message.stream === null)) {
 			const pending = times.flush();
 			if (pending) append(pending);
-			append(`\n${outputTime(new Date(), { timeZone })} [${message.error ? `log stream ended: ${message.error}` : "log stream ended"}]\n`);
+			colors.reset();
+			append(`\n${outputTime(new Date(), { timeZone })} [${message.error ? `log stream ended: ${message.error}` : "log stream ended"}]\n`, true);
 			stream = null;
 		}
 	});
@@ -163,9 +192,7 @@ function logs(live: Live): void {
 		followButton.textContent = follow ? "Following" : "Paused";
 		if (follow) output.scrollTop = output.scrollHeight;
 	});
-	root.querySelector("[data-logs-clear]")?.addEventListener("click", () => {
-		output.textContent = "";
-	});
+	root.querySelector("[data-logs-clear]")?.addEventListener("click", () => clear());
 	addEventListener("pagehide", () => {
 		if (stream) live.send({ type: "logs.close", stream });
 	});

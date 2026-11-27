@@ -56,8 +56,22 @@ const CHARTS = [
 	{ key: "blk", title: "Disk I/O" },
 ] as const;
 
-/** Four charts for one host or container. The browser draws them from /hosts/{id}/metrics.json. */
-export function chartsPanel(input: { hostId: number; target: string; range: Range; path: string; cpus: number | null; heading: string }): SafeHtml {
+/**
+ * Four charts for one host or container. The browser draws them from /hosts/{id}/metrics.json.
+ * A container on the host network has no interfaces of its own, so its traffic cannot be told
+ * apart from the host's and its network chart says so instead of waiting for samples.
+ */
+export function chartsPanel(input: {
+	hostId: number;
+	target: string;
+	range: Range;
+	path: string;
+	cpus: number | null;
+	heading: string;
+	hostNetwork?: boolean;
+}): SafeHtml {
+	const emptyNote = (key: string) =>
+		key === "net" && input.hostNetwork ? "This container uses the host network, so its traffic is counted in the host's network chart." : "";
 	return html`<section
 		class="panel charts"
 		data-charts
@@ -68,13 +82,23 @@ export function chartsPanel(input: { hostId: number; target: string; range: Rang
 	>
 		<div class="charts-head">
 			<h2>${input.heading}</h2>
-			${rangeRow(input.path, input.range)}
+			<div class="charts-tools">
+				<button type="button" class="button small" data-chart-reset hidden>Reset zoom</button>
+				${rangeRow(input.path, input.range)}
+			</div>
 		</div>
+		<p class="charts-hint muted small">Drag across a chart to zoom in, Shift and drag to pan, Ctrl and scroll to zoom, double click to reset.</p>
 		<div class="chart-grid">
 			${CHARTS.map(
 				(c) =>
-					html`<figure class="chart" data-chart="${c.key}">
-						<figcaption><span class="chart-title">${c.title}</span><span class="chart-note muted" data-chart-note></span></figcaption>
+					html`<figure class="chart" data-chart="${c.key}" data-chart-empty="${emptyNote(c.key)}">
+						<figcaption>
+							<span class="chart-title">${c.title}</span>
+							<span class="chart-caption-end">
+								<span class="chart-note muted" data-chart-note></span>
+								<button type="button" class="chart-full" data-chart-full aria-pressed="false">Full screen</button>
+							</span>
+						</figcaption>
 						<div class="chart-plot" data-chart-plot><p class="chart-empty muted">Loading...</p></div>
 					</figure>`,
 			)}

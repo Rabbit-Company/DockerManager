@@ -1,6 +1,6 @@
 {
 	"name": "dockermanager",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Manage Docker and Podman hosts from one web interface: monitoring, compose stacks, image updates, encrypted backups, transfers, alerts and firewall",
 	"type": "module",
 	"license": "EUPL-1.2",
@@ -29,6 +29,8 @@
 		"@rabbit-company/totp": "^1.0.1",
 		"@rabbit-company/web": "^0.21.0",
 		"@rabbit-company/web-middleware": "^0.21.0",
+		"chart.js": "^4.6.2",
+		"chartjs-plugin-zoom": "^3.0.2",
 		"codemirror": "^6.0.2",
 		"nodemailer": "^10.6.1",
 		"yaml": "^2.9.1"

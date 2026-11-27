@@ -771,7 +771,7 @@ export function containerPage(input: {
 				</section>
 			</div>
 		</div>
-		${chartsPanel({ hostId: input.hostId, target: summary.name, range: input.range, path: `/hosts/${input.hostId}/containers/${summary.id}`, cpus: input.cpus, heading: "Metrics" })}
+		${chartsPanel({ hostId: input.hostId, target: summary.name, range: input.range, path: `/hosts/${input.hostId}/containers/${summary.id}`, cpus: input.cpus, heading: "Metrics", hostNetwork: summary.networks.includes("host") })}
 		<section class="panel logs" data-logs data-host="${input.hostId}" data-container="${summary.id}">
 			<div class="logs-head">
 				<h2>Logs</h2>
