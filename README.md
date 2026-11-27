@@ -85,48 +85,42 @@ DockerManager is young. Try it on hosts you can afford to break before you trust
 - For NVMe health: `smartctl` from the `smartmontools` package on each agent host. RAID status comes from the kernel and needs no extra package
 - The controller needs one address both browsers and agents can reach, ideally HTTPS behind a reverse proxy
 
-## Install released executables
+## Install
 
-Download the latest [Linux release](../../releases/latest). Choose `dockermanager-linux-x64.tar.gz` for `x86_64` or `dockermanager-linux-arm64.tar.gz` for `aarch64`, and download `SHA256SUMS` into the same folder. The archive includes the controller, both agent executables and a systemd service file. No Bun installation is needed.
-
-```bash
-sha256sum -c --ignore-missing SHA256SUMS
-tar -xzf dockermanager-linux-x64.tar.gz
-sudo install -m 755 dockermanager-controller /usr/local/bin/dockermanager-controller
-sudo install -d -m 755 /opt/dockermanager /etc/dockermanager
-sudo install -m 755 agent-linux-x64 agent-linux-arm64 /opt/dockermanager/
-sudo install -m 644 dockermanager-controller.service /etc/systemd/system/
-printf 'DOMAIN=https://docker.example.com\nTZ=Europe/Ljubljana\n' | sudo tee /etc/dockermanager/controller.env
-sudo systemctl daemon-reload
-sudo systemctl enable --now dockermanager-controller
-sudo journalctl -u dockermanager-controller -n 30 --no-pager
-```
-
-For ARM64, change the archive name in the `tar` command. Set `DOMAIN` to the HTTPS address of your reverse proxy before starting the service. The service listens on `127.0.0.1:3000` and keeps its SQLite database and encryption key in `/var/lib/dockermanager`. The first start prints a setup token in the journal. Open `/setup` at your domain to create an account.
-
-To add a host, use the join command shown in the web interface. The controller serves the included agent executable for that host's architecture and installs it as a systemd service. The release also provides each agent executable separately for manual installs.
-
-Pushing a tag such as `v0.1.0` runs the release workflow. It checks the tag against the app version, runs tests, builds x64 and ARM64 executables, publishes the binaries and archives with `SHA256SUMS` on GitHub Releases. Running the workflow manually builds downloadable Actions artifacts without publishing a release.
-
-## Running the controller
-
-From source:
+Run this on the server that should host the controller:
 
 ```bash
-bun install
-bun run dev        # http://localhost:3000, data in data/controller.sqlite
+curl -fsSL https://github.com/Rabbit-Company/DockerManager/releases/latest/download/install.sh | sudo sh
 ```
 
-The first start prints a setup token in the log. Open `/setup`, enter the token, choose a username and password and scan the code with an authenticator app.
+The script picks the build for x86_64 or ARM64, checks the download against its checksum and installs the controller as a systemd service. It asks for the address browsers and agents will use, then prints the link and the setup token to finish in the browser: choose a username and password and scan the code with an authenticator app. No Bun or Docker is needed.
 
-With Docker:
+- Use `https://your.domain` when a reverse proxy serves DockerManager. The controller then listens on `127.0.0.1:3000` for the proxy. With a plain `http://` address it listens on port 3000 of every interface.
+- Skip the question with `curl ... | sudo DOMAIN=https://docker.example.com sh`. Install a given release with `VERSION=v0.1.0`.
+- Run the same command again to update. Your settings are kept.
+- Remove it with `curl ... | sudo sh -s -- --uninstall`. Settings and data stay until you delete them.
+
+Settings live in `/etc/dockermanager/controller.env`, all of them listed in `.env.example`. The database and the encryption key live in `/var/lib/dockermanager`, so back up that folder. Logs: `journalctl -u dockermanager-controller`.
+
+`TZ` sets the time zone of backup schedules, job output and container logs. The installer takes it from the system.
+
+### With Docker
 
 ```bash
 docker compose up -d --build
 docker compose logs controller | grep "setup token"
 ```
 
-Set `DOMAIN` to the public address before adding hosts, because join commands are built from it. Set `TZ`, such as `Europe/Ljubljana`, for the time zone of backup schedules, job output and container logs. Output times read like `2026-12-17 16:53:21`. All settings are listed in `.env.example`.
+Set `DOMAIN` and `TZ` in `docker-compose.yml` first.
+
+### From source
+
+```bash
+bun install
+bun run dev        # http://localhost:3000, data in data/controller.sqlite
+```
+
+The first start prints a setup token in the log. Open `/setup` and enter it.
 
 ## Adding a host
 
@@ -228,18 +222,18 @@ Database files in a named volume are included while the database container is st
 
 Every 30 seconds the controller looks at what the agents report. A condition has to hold for the rule's minutes before it fires, and the channels hear about it once when it starts and once when it clears:
 
-| Rule | Default |
-| --- | --- |
-| Host offline | 2 minutes without the agent |
-| Host CPU or memory high | above 90% for 10 minutes |
-| Filesystem almost full | above 90% |
-| Container unhealthy | failing healthcheck for 2 minutes |
-| Container restarting | restarting for 1 minute |
-| Container crashed | a container of a deployed stack exited with an error, not stopped by a signal |
-| Container near its memory limit | above 95% of its own limit for 5 minutes |
-| Backup failed, deploy or update failed | once per run |
-| Image update available | once per new version |
-| Firewall rules undone | when new rules were not kept in time |
+| Rule                                   | Default                                                                       |
+| -------------------------------------- | ----------------------------------------------------------------------------- |
+| Host offline                           | 2 minutes without the agent                                                   |
+| Host CPU or memory high                | above 90% for 10 minutes                                                      |
+| Filesystem almost full                 | above 90%                                                                     |
+| Container unhealthy                    | failing healthcheck for 2 minutes                                             |
+| Container restarting                   | restarting for 1 minute                                                       |
+| Container crashed                      | a container of a deployed stack exited with an error, not stopped by a signal |
+| Container near its memory limit        | above 95% of its own limit for 5 minutes                                      |
+| Backup failed, deploy or update failed | once per run                                                                  |
+| Image update available                 | once per new version                                                          |
+| Firewall rules undone                  | when new rules were not kept in time                                          |
 
 Each rule can be turned off, given another threshold or duration, and sent to some channels only, on the Alerts page. Alerts of a host whose agent is offline stay open, because there is no data to say they are over. Right after the controller starts, offline hosts are reported only after 3 minutes, so agents have time to reconnect.
 

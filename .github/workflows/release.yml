@@ -1,19 +1,29 @@
 name: Release binaries
 
 on:
-  push:
-    tags:
-      - "v[0-9]*"
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to attach binaries to. Leave empty to build only.
+        required: false
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag || github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.5
@@ -21,7 +31,10 @@ jobs:
       - run: bun run typecheck
       - run: bun test
       - run: bun run scripts/check-release.ts
-        if: github.ref_type == 'tag'
+        if: github.event_name == 'release' || inputs.tag != ''
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          GITHUB_REF_NAME: ${{ github.event.release.tag_name || inputs.tag }}
       - run: bun run build
       - name: Package binaries
         run: |
@@ -37,24 +50,25 @@ jobs:
             install -m 755 dist/agent-linux-x64 "$stage/agent-linux-x64"
             install -m 755 dist/agent-linux-arm64 "$stage/agent-linux-arm64"
             install -m 644 packaging/dockermanager-controller.service "$stage/dockermanager-controller.service"
-            tar -C "$stage" -czf "release/dockermanager-linux-$arch.tar.gz" .
+            tar -C "$stage" --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf - . | gzip -n > "release/dockermanager-linux-$arch.tar.gz"
           done
+          install -m 755 packaging/install.sh release/install.sh
           cd release
-          sha256sum dockermanager-* > SHA256SUMS
-      - uses: actions/upload-artifact@v4
+          sha256sum dockermanager-* install.sh > SHA256SUMS
+      - uses: actions/upload-artifact@v7
         with:
           name: dockermanager-binaries
           path: release/
           if-no-files-found: error
 
   publish:
-    if: github.ref_type == 'tag'
+    if: github.event_name == 'release' || inputs.tag != ''
     needs: build
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dockermanager-binaries
           path: release
@@ -62,4 +76,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release create "$GITHUB_REF_NAME" release/* --verify-tag --generate-notes
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          release_id=$(gh release view "$RELEASE_TAG" --json databaseId --jq '.databaseId')
+          gh api "repos/$GH_REPO/releases/$release_id/assets" --paginate --jq '.[] | [.name, .digest] | @tsv' > /tmp/dockermanager-release-assets.tsv
+          for asset in release/dockermanager-* release/install.sh release/SHA256SUMS; do
+            name="${asset##*/}"
+            remote_digest=$(awk -F '\t' -v asset_name="$name" '$1 == asset_name { print $2; exit }' /tmp/dockermanager-release-assets.tsv)
+            if [ -n "$remote_digest" ]; then
+              local_digest="sha256:$(sha256sum "$asset" | cut -d ' ' -f 1)"
+              if [ "$remote_digest" != "$local_digest" ]; then
+                echo "Existing release asset $name differs from this build. Use a new release tag or remove that asset manually." >&2
+                exit 1
+              fi
+              echo "$name is already attached"
+            else
+              gh release upload "$RELEASE_TAG" "$asset"
+            fi
+          done
