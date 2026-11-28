@@ -1,6 +1,6 @@
 {
 	"name": "dockermanager",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "Manage Docker and Podman hosts from one web interface: monitoring, compose stacks, image updates, encrypted backups, transfers, alerts and firewall",
 	"type": "module",
 	"license": "EUPL-1.2",
